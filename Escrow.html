@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freelance Escrow Platform</title>
+    <!-- โหลด Tailwind CSS และ Ethers.js -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+
+<body class="bg-gray-100 text-gray-800 p-8">
+    <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold mb-4 text-blue-600">Smart Payment Escrow</h1>
+
+        <!-- เพิ่มช่องกรอก Contract Address -->
+        <div class="mb-6 p-4 border rounded bg-blue-50">
+            <label class="block text-sm font-bold mb-2 text-blue-700">Contract Address ที่ Deploy แล้ว:</label>
+            <input type="text" id="contractAddressInput" placeholder="วาง Address ที่ขึ้นต้นด้วย 0x ที่นี่..."
+                class="border p-2 w-full rounded">
+        </div>
+
+        <button id="connectBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-6">
+            เชื่อมต่อ MetaMask
+        </button>
+        <p id="walletAddress" class="text-sm text-gray-500 mb-6"></p>
+
+        <div class="space-y-4">
+            <!-- ส่วนของผู้ว่าจ้าง -->
+            <div class="p-4 border rounded bg-gray-50">
+                <h2 class="font-bold mb-2">ฝั่งผู้ว่าจ้าง (Employer)</h2>
+                <button id="depositBtn"
+                    class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 w-full mb-2">
+                    ฝากเงินค่าจ้างเข้า Escrow (Deposit)
+                </button>
+                <button id="approveBtn" class="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 w-full">
+                    ตรวจรับงานและอนุมัติเงิน (Approve)
+                </button>
+            </div>
+
+            <!-- ส่วนของฟรีแลนซ์ -->
+            <div class="p-4 border rounded bg-gray-50">
+                <h2 class="font-bold mb-2">ฝั่งฟรีแลนซ์ (Freelancer)</h2>
+                <input type="text" id="workUrl" placeholder="ใส่ URL ไฟล์งาน" class="border p-2 w-full rounded mb-2">
+                <button id="submitBtn" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 w-full">
+                    ส่งมอบงาน (Submit Work)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ยังคงต้องนำ ABI จาก Remix มาวางในนี้เหมือนเดิม
+        const contractABI = [
+            {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "amount",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "approveAndRelease",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "depositPayment",
+                "outputs": [],
+                "stateMutability": "payable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "string",
+                        "name": "_workHash",
+                        "type": "string"
+                    }
+                ],
+                "name": "submitWork",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address payable",
+                        "name": "_freelancer",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "_projectName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_amount",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "amount",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "currentState",
+                "outputs": [
+                    {
+                        "internalType": "enum FreelanceEscrow.State",
+                        "name": "",
+                        "type": "uint8"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "employer",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "freelancer",
+                "outputs": [
+                    {
+                        "internalType": "address payable",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "projectName",
+                "outputs": [
+                    {
+                        "internalType": "string",
+                        "name": "",
+                        "type": "string"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "workHash",
+                "outputs": [
+                    {
+                        "internalType": "string",
+                        "name": "",
+                        "type": "string"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+            
+        ];
+
+        let provider, signer, escrowContract;
+
+        document.getElementById("connectBtn").addEventListener("click", async () => {
+            // 1. ดึงค่า Address จากช่องกรอกบนหน้าเว็บ
+            const currentContractAddress = document.getElementById("contractAddressInput").value.trim();
+
+            // 2. เช็คว่าผู้ใช้กรอกข้อมูลหรือยัง
+            if (!currentContractAddress) {
+                alert("กรุณาวาง Contract Address ก่อนเชื่อมต่อกระเป๋าครับ");
+                return;
+            }
+
+            if (typeof window.ethereum !== "undefined") {
+                try {
+                    await window.ethereum.request({ method: "eth_requestAccounts" });
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+                    const address = await signer.getAddress();
+
+                    document.getElementById("walletAddress").innerText = "เชื่อมต่อแล้ว: " + address;
+
+                    // 3. นำ Address จากหน้าเว็บมาสร้าง Contract Instance
+                    escrowContract = new ethers.Contract(currentContractAddress, contractABI, signer);
+                } catch (error) {
+                    console.error(error);
+                    alert("เกิดข้อผิดพลาดในการเชื่อมต่อ MetaMask");
+                }
+            } else {
+                alert("กรุณาติดตั้ง MetaMask!");
+            }
+        });
+
+        // ฟังก์ชันฝากเงิน
+        document.getElementById("depositBtn").addEventListener("click", async () => {
+            if (!escrowContract) return alert("กรุณาเชื่อมต่อกระเป๋าก่อน");
+            try {
+                const amount = await escrowContract.amount();
+                const tx = await escrowContract.depositPayment({ value: amount });
+                await tx.wait();
+                alert("ฝากเงินเข้า Escrow สำเร็จ!");
+            } catch (error) {
+                console.error(error);
+                alert("เกิดข้อผิดพลาดในการฝากเงิน ลองตรวจสอบว่าคุณใช้กระเป๋าผู้ว่าจ้างและมีเงินพอหรือไม่");
+            }
+        });
+
+        // ฟังก์ชันส่งงาน
+        document.getElementById("submitBtn").addEventListener("click", async () => {
+            if (!escrowContract) return alert("กรุณาเชื่อมต่อกระเป๋าก่อน");
+            const workUrl = document.getElementById("workUrl").value.trim();
+            if (!workUrl) return alert("กรุณาใส่ URL ไฟล์งานก่อนส่ง");
+
+            try {
+                const tx = await escrowContract.submitWork(workUrl);
+                await tx.wait();
+                alert("ส่งงานสำเร็จ!");
+            } catch (error) {
+                console.error(error);
+                alert("เกิดข้อผิดพลาดในการส่งงาน ลองตรวจสอบว่าคุณใช้กระเป๋าฟรีแลนซ์หรือไม่");
+            }
+        });
+
+        // ฟังก์ชันอนุมัติเงิน
+        document.getElementById("approveBtn").addEventListener("click", async () => {
+            if (!escrowContract) return alert("กรุณาเชื่อมต่อกระเป๋าก่อน");
+            try {
+                const tx = await escrowContract.approveAndRelease();
+                await tx.wait();
+                alert("อนุมัติและโอนเงินให้ฟรีแลนซ์สำเร็จ!");
+            } catch (error) {
+                console.error(error);
+                alert("เกิดข้อผิดพลาดในการอนุมัติเงิน");
+            }
+        });
+    </script>
+</body>
+
+</html>
